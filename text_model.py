@@ -37,7 +37,7 @@ class SimpleVocab(object):
   def add_text_to_vocab(self, text):
     tokens = self.tokenize_text(text)
     for token in tokens:
-      if not self.word2id.has_key(token):
+      if token not in self.word2id:
         self.word2id[token] = len(self.word2id)
         self.wordcount[token] = 0
       self.wordcount[token] += 1
