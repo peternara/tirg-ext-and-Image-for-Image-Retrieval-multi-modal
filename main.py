@@ -266,6 +266,9 @@ def main():
   #  logger.add_text(k, str(opt.__dict__[k]))
 
   trainset, testset = load_dataset(opt)
+  for t in trainset.get_all_texts():
+      print(t)
+
   model, optimizer = create_model_and_optimizer(
       opt, [t.decode('utf-8') for t in trainset.get_all_texts()])
 
