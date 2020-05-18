@@ -24,7 +24,7 @@ import time
 import datasets
 import img_text_composition_models
 import numpy as np
-from tensorboardX import SummaryWriter
+#from tensorboardX import SummaryWriter
 import test_retrieval
 import torch
 import torch.utils.data
@@ -38,46 +38,37 @@ def parse_opt():
   """Parses the input arguments."""
   parser = argparse.ArgumentParser()
   parser.add_argument('-f', type=str, default='')
-  parser.add_argument('--comment', type=str, default='test_notebook')
-  parser.add_argument('--dataset', type=str, default='css3d')
+  parser.add_argument('--comment', type=str, default='f200k_concat')
+  parser.add_argument('--dataset', type=str, default='fashion200k')
   parser.add_argument(
-      '--dataset_path', type=str, default='../imgcomsearch/CSSDataset/output')
+      '--dataset_path', type=str, default='/content/drive/My Drive/fashion-200k')
   parser.add_argument('--model', type=str, default='tirg')
   parser.add_argument('--embed_dim', type=int, default=512)
   parser.add_argument('--learning_rate', type=float, default=1e-2)
   parser.add_argument(
-      '--learning_rate_decay_frequency', type=int, default=9999999)
+      '--learning_rate_decay_frequency', type=int, default=50000)
   parser.add_argument('--batch_size', type=int, default=32)
   parser.add_argument('--weight_decay', type=float, default=1e-6)
-  parser.add_argument('--num_iters', type=int, default=210000)
+  parser.add_argument('--num_iters', type=int, default=160000)
   parser.add_argument('--loss', type=str, default='soft_triplet')
   parser.add_argument('--loader_num_workers', type=int, default=4)
+  
   args = parser.parse_args()
   return args
 
 
+# fashion-200k
+'''
+<dataset_path>/labels/*.txt
+<dataset_path>/women/<category>/<caption>/<id>/*.jpeg
+<dataset_path>/test_queries.txt`
+'''
+
 def load_dataset(opt):
   """Loads the input datasets."""
-  print 'Reading dataset ', opt.dataset
-  if opt.dataset == 'css3d':
-    trainset = datasets.CSSDataset(
-        path=opt.dataset_path,
-        split='train',
-        transform=torchvision.transforms.Compose([
-            torchvision.transforms.ToTensor(),
-            torchvision.transforms.Normalize([0.485, 0.456, 0.406],
-                                             [0.229, 0.224, 0.225])
-        ]))
-    testset = datasets.CSSDataset(
-        path=opt.dataset_path,
-        split='test',
-        transform=torchvision.transforms.Compose([
-            torchvision.transforms.ToTensor(),
-            torchvision.transforms.Normalize([0.485, 0.456, 0.406],
-                                             [0.229, 0.224, 0.225])
-        ]))
-  elif opt.dataset == 'fashion200k':
-    trainset = datasets.Fashion200k(
+  print ('Reading dataset ', opt.dataset)
+  
+  trainset = datasets.Fashion200k(
         path=opt.dataset_path,
         split='train',
         transform=torchvision.transforms.Compose([
@@ -87,49 +78,29 @@ def load_dataset(opt):
             torchvision.transforms.Normalize([0.485, 0.456, 0.406],
                                              [0.229, 0.224, 0.225])
         ]))
-    testset = datasets.Fashion200k(
-        path=opt.dataset_path,
-        split='test',
-        transform=torchvision.transforms.Compose([
-            torchvision.transforms.Resize(224),
-            torchvision.transforms.CenterCrop(224),
-            torchvision.transforms.ToTensor(),
-            torchvision.transforms.Normalize([0.485, 0.456, 0.406],
-                                             [0.229, 0.224, 0.225])
-        ]))
-  elif opt.dataset == 'mitstates':
-    trainset = datasets.MITStates(
-        path=opt.dataset_path,
-        split='train',
-        transform=torchvision.transforms.Compose([
-            torchvision.transforms.Resize(224),
-            torchvision.transforms.CenterCrop(224),
-            torchvision.transforms.ToTensor(),
-            torchvision.transforms.Normalize([0.485, 0.456, 0.406],
-                                             [0.229, 0.224, 0.225])
-        ]))
-    testset = datasets.MITStates(
-        path=opt.dataset_path,
-        split='test',
-        transform=torchvision.transforms.Compose([
-            torchvision.transforms.Resize(224),
-            torchvision.transforms.CenterCrop(224),
-            torchvision.transforms.ToTensor(),
-            torchvision.transforms.Normalize([0.485, 0.456, 0.406],
-                                             [0.229, 0.224, 0.225])
-        ]))
-  else:
-    print 'Invalid dataset', opt.dataset
-    sys.exit()
 
-  print 'trainset size:', len(trainset)
-  print 'testset size:', len(testset)
+  testset = datasets.Fashion200k(
+        path=opt.dataset_path,
+        split='test',
+        transform=torchvision.transforms.Compose([
+            torchvision.transforms.Resize(224),
+            torchvision.transforms.CenterCrop(224),
+            torchvision.transforms.ToTensor(),
+            torchvision.transforms.Normalize([0.485, 0.456, 0.406],
+                                             [0.229, 0.224, 0.225])
+        ]))
+
+
+  print ('trainset size:', len(trainset))
+  print ('testset size:', len(testset))
   return trainset, testset
 
 
 def create_model_and_optimizer(opt, texts):
   """Builds the model and related optimizer."""
-  print 'Creating model and optimizer for', opt.model
+
+  print ('Creating model and optimizer for', opt.model)
+
   if opt.model == 'imgonly':
     model = img_text_composition_models.SimpleModelImageOnly(
         texts, embed_dim=opt.embed_dim)
@@ -144,9 +115,10 @@ def create_model_and_optimizer(opt, texts):
     model = img_text_composition_models.TIRGLastConv(
         texts, embed_dim=opt.embed_dim)
   else:
-    print 'Invalid model', opt.model
-    print 'available: imgonly, textonly, concat, tirg or tirg_lastconv'
+    print('Invalid model', opt.model)
+    print('available: imgonly, textonly, concat, tirg or tirg_lastconv')    
     sys.exit()
+
   model = model.cuda()
 
   # create optimizer
@@ -174,9 +146,9 @@ def create_model_and_optimizer(opt, texts):
   return model, optimizer
 
 
-def train_loop(opt, logger, trainset, testset, model, optimizer):
+def train_loop(opt, trainset, testset, model, optimizer):
   """Function for train loop"""
-  print 'Begin training'
+  print('Begin training')
   losses_tracking = {}
   it = 0
   epoch = -1
@@ -185,41 +157,43 @@ def train_loop(opt, logger, trainset, testset, model, optimizer):
     epoch += 1
 
     # show/log stats
-    print 'It', it, 'epoch', epoch, 'Elapsed time', round(time.time() - tic,
-                                                          4), opt.comment
+    print('It', it, 'epoch', epoch, 'Elapsed time', round(time.time() - tic,
+                                                          4), opt.comment)
     tic = time.time()
     for loss_name in losses_tracking:
       avg_loss = np.mean(losses_tracking[loss_name][-len(trainloader):])
-      print '    Loss', loss_name, round(avg_loss, 4)
-      logger.add_scalar(loss_name, avg_loss, it)
-    logger.add_scalar('learning_rate', optimizer.param_groups[0]['lr'], it)
+
+      print('    Loss', loss_name, round(avg_loss, 4))
+      #logger.add_scalar(loss_name, avg_loss, it)
+
+    #logger.add_scalar('learning_rate', optimizer.param_groups[0]['lr'], it)
 
     # test
     if epoch % 3 == 1:
       tests = []
       for name, dataset in [('train', trainset), ('test', testset)]:
-        t = test_retrieval.test(opt, model, dataset)
+        t   = test_retrieval.test(opt, model, dataset)
         tests += [(name + ' ' + metric_name, metric_value)
                   for metric_name, metric_value in t]
+
       for metric_name, metric_value in tests:
-        logger.add_scalar(metric_name, metric_value, it)
-        print '    ', metric_name, round(metric_value, 4)
+      #  logger.add_scalar(metric_name, metric_value, it)        
+        print('    ', metric_name, round(metric_value, 4))
 
     # save checkpoint
     torch.save({
-        'it': it,
-        'opt': opt,
-        'model_state_dict': model.state_dict(),
-    },
-               logger.file_writer.get_logdir() + '/latest_checkpoint.pth')
+        'it'               : it,
+        'opt'              : opt,
+        'model_state_dict' : model.state_dict(),
+         }, '/content/drive/My Drive/colab_model/tirg/latest_checkpoint.pth')
 
     # run trainning for 1 epoch
     model.train()
     trainloader = trainset.get_loader(
-        batch_size=opt.batch_size,
-        shuffle=True,
-        drop_last=True,
-        num_workers=opt.loader_num_workers)
+        batch_size  = opt.batch_size,
+        shuffle     = True,
+        drop_last   = True,
+        num_workers = opt.loader_num_workers)
 
 
     def training_1_iter(data):
@@ -242,11 +216,13 @@ def train_loop(opt, logger, trainset, testset, model, optimizer):
         loss_value = model.compute_loss(
             img1, mods, img2, soft_triplet_loss=False)
       else:
-        print 'Invalid loss function', opt.loss
+        print('Invalid loss function', opt.loss)        
         sys.exit()
-      loss_name = opt.loss
+
+      loss_name   = opt.loss
       loss_weight = 1.0
-      losses += [(loss_name, loss_weight, loss_value)]
+      losses     += [(loss_name, loss_weight, loss_value)]
+
       total_loss = sum([
           loss_weight * loss_value
           for loss_name, loss_weight, loss_value in losses
@@ -274,26 +250,29 @@ def train_loop(opt, logger, trainset, testset, model, optimizer):
         for g in optimizer.param_groups:
           g['lr'] *= 0.1
 
-  print 'Finished training'
+  print('Finished training')
 
 
 def main():
   opt = parse_opt()
-  print 'Arguments:'
-  for k in opt.__dict__.keys():
-    print '    ', k, ':', str(opt.__dict__[k])
 
-  logger = SummaryWriter(comment=opt.comment)
-  print 'Log files saved to', logger.file_writer.get_logdir()
+  print('Arguments:')
   for k in opt.__dict__.keys():
-    logger.add_text(k, str(opt.__dict__[k]))
+    print('    ', k, ':', str(opt.__dict__[k]))
+
+  #logger = SummaryWriter(comment=opt.comment)
+  # print('Log files saved to', logger.file_writer.get_logdir())
+  #for k in opt.__dict__.keys():
+  #  logger.add_text(k, str(opt.__dict__[k]))
 
   trainset, testset = load_dataset(opt)
   model, optimizer = create_model_and_optimizer(
       opt, [t.decode('utf-8') for t in trainset.get_all_texts()])
 
-  train_loop(opt, logger, trainset, testset, model, optimizer)
-  logger.close()
+  #train_loop(opt, logger, trainset, testset, model, optimizer)
+  train_loop(opt, trainset, testset, model, optimizer)
+
+  #logger.close()
 
 
 if __name__ == '__main__':

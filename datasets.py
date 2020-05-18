@@ -40,11 +40,11 @@ class BaseDataset(torch.utils.data.Dataset):
                  num_workers=0):
     return torch.utils.data.DataLoader(
         self,
-        batch_size=batch_size,
-        shuffle=shuffle,
-        num_workers=num_workers,
-        drop_last=drop_last,
-        collate_fn=lambda i: i)
+        batch_size  = batch_size,
+        shuffle     = shuffle,
+        num_workers = num_workers,
+        drop_last   = drop_last,
+        collate_fn  = lambda i: i)
 
   def get_test_queries(self):
     return self.test_queries
@@ -68,12 +68,13 @@ class CSSDataset(BaseDataset):
   def __init__(self, path, split='train', transform=None):
     super(CSSDataset, self).__init__()
 
-    self.img_path = path + '/images/'
+    self.img_path  = path + '/images/'
     self.transform = transform
-    self.split = split
-    self.data = np.load(path + '/css_toy_dataset_novel2_small.dup.npy').item()
-    self.mods = self.data[self.split]['mods']
-    self.imgs = []
+    self.split     = split
+    self.data      = np.load(path + '/css_toy_dataset_novel2_small.dup.npy').item()
+    self.mods      = self.data[self.split]['mods']
+    self.imgs      = []
+
     for objects in self.data[self.split]['objects_img']:
       label = len(self.imgs)
       if self.data[self.split].has_key('labels'):
@@ -87,6 +88,7 @@ class CSSDataset(BaseDataset):
     self.imgid2modtarget = {}
     for i in range(len(self.imgs)):
       self.imgid2modtarget[i] = []
+
     for i, mod in enumerate(self.mods):
       for k in range(len(mod['from'])):
         f = mod['from'][k]
@@ -242,7 +244,7 @@ class Fashion200k(BaseDataset):
             'modifiable': False
         }
         self.imgs += [img]
-    print 'Fashion200k:', len(self.imgs), 'images'
+    print('Fashion200k:', len(self.imgs), 'images')
 
     # generate query for training or testing
     if split == 'train':
@@ -266,8 +268,10 @@ class Fashion200k(BaseDataset):
     file2imgid = {}
     for i, img in enumerate(self.imgs):
       file2imgid[img['file_path']] = i
-    with open(self.img_path + '/test_queries.txt') as f:
+      
+    with open('/content/drive/My Drive/DataSet/Fashion/fashion-200k/test_queries.txt') as f:
       lines = f.readlines()
+
     self.test_queries = []
     for line in lines:
       source_file, target_file = line.split()
@@ -278,7 +282,7 @@ class Fashion200k(BaseDataset):
       source_word, target_word, mod_str = self.get_different_word(
           source_caption, target_caption)
       self.test_queries += [{
-          'source_img_id': idx,
+          'source_img_id' : idx,
           'source_caption': source_caption,
           'target_caption': target_caption,
           'mod': {
@@ -290,18 +294,20 @@ class Fashion200k(BaseDataset):
     """ index caption to generate training query-target example on the fly later"""
 
     # index caption 2 caption_id and caption 2 image_ids
-    caption2id = {}
-    id2caption = {}
+    caption2id     = {}
+    id2caption     = {}
     caption2imgids = {}
+
     for i, img in enumerate(self.imgs):
       for c in img['captions']:
-        if not caption2id.has_key(c):
+        if c not in caption2id:
           id2caption[len(caption2id)] = c
-          caption2id[c] = len(caption2id)
-          caption2imgids[c] = []
+          caption2id[c]               = len(caption2id)
+          caption2imgids[c]           = []
         caption2imgids[c].append(i)
     self.caption2imgids = caption2imgids
-    print len(caption2imgids), 'unique cations'
+
+    print(len(caption2imgids), 'unique cations')
 
     # parent captions are 1-word shorter than their children
     parent2children_captions = {}
@@ -309,16 +315,20 @@ class Fashion200k(BaseDataset):
       for w in c.split():
         p = c.replace(w, '')
         p = p.replace('  ', ' ').strip()
-        if not parent2children_captions.has_key(p):
+
+        if p not in parent2children_captions:
           parent2children_captions[p] = []
+
         if c not in parent2children_captions[p]:
           parent2children_captions[p].append(c)
+
     self.parent2children_captions = parent2children_captions
 
     # identify parent captions for each image
     for img in self.imgs:
-      img['modifiable'] = False
+      img['modifiable']      = False
       img['parent_captions'] = []
+
     for p in parent2children_captions:
       if len(parent2children_captions[p]) >= 2:
         for c in parent2children_captions[p]:
@@ -329,7 +339,7 @@ class Fashion200k(BaseDataset):
     for img in self.imgs:
       if img['modifiable']:
         num_modifiable_imgs += 1
-    print 'Modifiable images', num_modifiable_imgs
+    print('Modifiable images', num_modifiable_imgs)
 
   def caption_index_sample_(self, idx):
     while not self.imgs[idx]['modifiable']:
@@ -362,27 +372,30 @@ class Fashion200k(BaseDataset):
     return len(self.imgs)
 
   def __getitem__(self, idx):
-    idx, target_idx, source_word, target_word, mod_str = self.caption_index_sample_(
-        idx)
-    out = {}
-    out['source_img_id'] = idx
+    idx, target_idx, source_word, target_word, mod_str = self.caption_index_sample_(idx)
+
+    out                    = {}
+    out['source_img_id']   = idx
     out['source_img_data'] = self.get_img(idx)
-    out['source_caption'] = self.imgs[idx]['captions'][0]
-    out['target_img_id'] = target_idx
+    out['source_caption']  = self.imgs[idx]['captions'][0]
+    out['target_img_id']   = target_idx
     out['target_img_data'] = self.get_img(target_idx)
-    out['target_caption'] = self.imgs[target_idx]['captions'][0]
-    out['mod'] = {'str': mod_str}
+    out['target_caption']  = self.imgs[target_idx]['captions'][0]
+    out['mod']             = {'str': mod_str}
     return out
 
-  def get_img(self, idx, raw_img=False):
+  def get_img(self, idx, raw_img=False):    
     img_path = self.img_path + self.imgs[idx]['file_path']
+
     with open(img_path, 'rb') as f:
       img = PIL.Image.open(f)
       img = img.convert('RGB')
+
     if raw_img:
       return img
     if self.transform:
       img = self.transform(img)
+
     return img
 
 
@@ -391,11 +404,11 @@ class MITStates(BaseDataset):
 
   def __init__(self, path, split='train', transform=None):
     super(MITStates, self).__init__()
-    self.path = path
+    self.path      = path
     self.transform = transform
-    self.split = split
+    self.split     = split
 
-    self.imgs = []
+    self.imgs  = []
     test_nouns = [
         u'armor', u'bracelet', u'bush', u'camera', u'candy', u'castle',
         u'ceramic', u'cheese', u'clock', u'clothes', u'coffee', u'fan', u'fig',
@@ -458,12 +471,12 @@ class MITStates(BaseDataset):
     mod_str = self.imgs[target_idx]['adj']
 
     return {
-        'source_img_id': idx,
+        'source_img_id'  : idx,
         'source_img_data': self.get_img(idx),
-        'source_caption': self.imgs[idx]['captions'][0],
-        'target_img_id': target_idx,
+        'source_caption' : self.imgs[idx]['captions'][0],
+        'target_img_id'  : target_idx,
         'target_img_data': self.get_img(target_idx),
-        'target_caption': self.imgs[target_idx]['captions'][0],
+        'target_caption' : self.imgs[target_idx]['captions'][0],
         'mod': {
             'str': mod_str
         }
@@ -510,7 +523,7 @@ class MITStates(BaseDataset):
                   'str': mod_str
               }
           }]
-    print len(self.test_queries), 'test queries'
+    print(len(self.test_queries), 'test queries')
 
   def __len__(self):
     return len(self.imgs)
