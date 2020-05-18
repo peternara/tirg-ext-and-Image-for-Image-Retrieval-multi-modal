@@ -30,8 +30,8 @@ class SimpleVocab(object):
 
   def tokenize_text(self, text):
     text = text.encode('ascii', 'ignore').decode('ascii')
-    tokens = str(text).lower().translate(None,
-                                         string.punctuation).strip().split()
+    tokens = str(text).lower().translate(str.maketrans('','',string.punctuation)).strip().split()
+    #tokens = str(text).lower().translate(None, string.punctuation).strip().split()
     return tokens
 
   def add_text_to_vocab(self, text):
