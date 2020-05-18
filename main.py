@@ -119,7 +119,8 @@ def create_model_and_optimizer(opt, texts):
     print('available: imgonly, textonly, concat, tirg or tirg_lastconv')    
     sys.exit()
 
-  model = model.cuda()
+  if torch.cuda.is_available():
+     model = model.cuda()
 
   # create optimizer
   params = []
